@@ -25,7 +25,7 @@
 <pre><code class="language-xml">&lt;dependency&gt;
   &lt;groupId&gt;com.ernoxin&lt;/groupId&gt;
   &lt;artifactId&gt;ZarinPal-java-SDK&lt;/artifactId&gt;
-  &lt;version&gt;1.0.2&lt;/version&gt;
+  &lt;version&gt;1.0.3&lt;/version&gt;
 &lt;/dependency&gt;
 </code></pre>
 </div>
@@ -182,7 +182,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class PaymentService {
-    private final ZarinpalClient client;
+private final ZarinpalClient client;
 }
 </code></pre>
 </div>
@@ -200,9 +200,9 @@ public class PaymentService {
 );
 
 PaymentRequest request = PaymentRequest.builder(150000, "خرید اشتراک ماهانه")
-        .currency(ZarinpalCurrency.IRR)
-        .metadata(metadata)
-        .build();
+.currency(ZarinpalCurrency.IRR)
+.metadata(metadata)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>
@@ -491,9 +491,9 @@ PaymentRequestResult result = client.requestPayment(request);
 );
 
 PaymentRequest request = PaymentRequest.builder(120000, "پرداخت سفارش 3001")
-        .callbackUrl(URI.create("https://example.com/payment/callback"))
-        .metadata(metadata)
-        .build();
+.callbackUrl(URI.create("https://example.com/payment/callback"))
+.metadata(metadata)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>
@@ -510,8 +510,8 @@ PaymentRequestResult result = client.requestPayment(request);
 );
 
 PaymentRequest request = PaymentRequest.builder(50000, "خرید کالا")
-        .metadata(metadata)
-        .build();
+.metadata(metadata)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>
@@ -529,8 +529,8 @@ PaymentRequestResult result = client.requestPayment(request);
 );
 
 PaymentRequest request = PaymentRequest.builder(150000, "پرداخت سفارش 1010")
-        .cartData(cartData)
-        .build();
+.cartData(cartData)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>
@@ -544,8 +544,8 @@ PaymentRequestResult result = client.requestPayment(request);
 );
 
 PaymentRequest request = PaymentRequest.builder(200000, "تسویه اشتراکی")
-        .wages(wages)
-        .build();
+.wages(wages)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>
@@ -562,8 +562,8 @@ PaymentRequestResult result = client.requestPayment(request);
 );
 
 PaymentRequest request = PaymentRequest.builder(10000, "پرداخت با کارت مشخص")
-        .metadata(metadata)
-        .build();
+.metadata(metadata)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>
@@ -590,8 +590,8 @@ PaymentRequestResult result = client.requestPayment(request);
 );
 
 PaymentRequest request = PaymentRequest.builder(10000, "پرداخت با ذخیره کارت")
-        .metadata(metadata)
-        .build();
+.metadata(metadata)
+.build();
 
 PaymentRequestResult result = client.requestPayment(request);
 </code></pre>

@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.ernoxin</groupId>
     <artifactId>ZarinPal-java-SDK</artifactId>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <name>ZarinPal-java-SDK</name>
     <description>ZarinPal-java-SDK</description>
 
@@ -28,9 +28,8 @@
             <artifactId>spring-web</artifactId>
         </dependency>
         <dependency>
-            <groupId>tools.jackson.core</groupId>
+            <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
-            <version>3.0.3</version>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>

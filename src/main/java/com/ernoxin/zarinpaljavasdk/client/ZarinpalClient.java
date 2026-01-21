@@ -10,6 +10,7 @@ import com.ernoxin.zarinpaljavasdk.model.*;
 import com.ernoxin.zarinpaljavasdk.support.ZarinpalEndpoints;
 import com.ernoxin.zarinpaljavasdk.support.ZarinpalValidation;
 import org.springframework.util.MultiValueMap;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
 import java.util.*;
@@ -97,7 +98,11 @@ public final class ZarinpalClient {
     public String buildRedirectUrl(String authority) {
         ZarinpalValidation.requireAuthority(authority);
         URI baseUrl = config.baseUrl();
-        return baseUrl + ZarinpalEndpoints.startPay() + authority;
+        return UriComponentsBuilder.fromUri(baseUrl)
+                .path(ZarinpalEndpoints.startPay())
+                .path(authority)
+                .build()
+                .toUriString();
     }
 
     public ZarinpalCallback parseCallback(Map<String, String> queryParams) {

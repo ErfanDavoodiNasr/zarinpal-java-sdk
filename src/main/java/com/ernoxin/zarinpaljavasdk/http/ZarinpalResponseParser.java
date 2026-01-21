@@ -2,10 +2,10 @@ package com.ernoxin.zarinpaljavasdk.http;
 
 import com.ernoxin.zarinpaljavasdk.exception.ZarinpalApiException;
 import com.ernoxin.zarinpaljavasdk.support.ZarinpalErrorCatalog;
+import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.ResponseEntity;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 import java.util.Set;
 
@@ -91,8 +91,8 @@ public final class ZarinpalResponseParser {
         if (node.isInt() || node.isLong()) {
             return node.asInt();
         }
-        if (node.isString()) {
-            String text = node.asString();
+        if (node.isTextual()) {
+            String text = node.asText();
             if (text != null) {
                 String trimmed = text.trim();
                 try {
@@ -137,12 +137,39 @@ public final class ZarinpalResponseParser {
         if (rootMessage != null) {
             return rootMessage;
         }
-        if (errorsNode == null || errorsNode.isMissingNode() || errorsNode.isNull()) {
+        return findMessage(errorsNode);
+    }
+
+    private String findMessage(JsonNode node) {
+        if (node == null || node.isNull() || node.isMissingNode()) {
             return null;
         }
-        String errorsMessage = textOrNull(errorsNode.get("message"));
-        if (errorsMessage != null) {
-            return errorsMessage;
+        if (node.isObject()) {
+            String direct = textOrNull(node.get("message"));
+            if (direct != null) {
+                return direct;
+            }
+            for (JsonNode child : node) {
+                if (child.isContainerNode()) {
+                    String found = findMessage(child);
+                    if (found != null) {
+                        return found;
+                    }
+                }
+            }
+            return null;
+        }
+        if (node.isArray()) {
+            for (JsonNode item : node) {
+                String found = findMessage(item);
+                if (found != null) {
+                    return found;
+                }
+            }
+            return null;
+        }
+        if (node.isTextual()) {
+            return textOrNull(node);
         }
         return null;
     }
@@ -151,8 +178,8 @@ public final class ZarinpalResponseParser {
         if (node == null || node.isNull() || node.isMissingNode()) {
             return null;
         }
-        if (node.isString()) {
-            String value = node.asString();
+        if (node.isTextual()) {
+            String value = node.asText();
             return value != null && !value.isBlank() ? value : null;
         }
         return null;
