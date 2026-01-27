@@ -6,17 +6,22 @@ import com.ernoxin.zarinpaljavasdk.exception.ZarinpalValidationException;
 import com.ernoxin.zarinpaljavasdk.support.ZarinpalObjectMapper;
 import com.fasterxml.jackson.core.JacksonException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.DefaultResponseErrorHandler;
-import org.springframework.web.client.ResponseErrorHandler;
-import org.springframework.web.client.RestClientException;
-import org.springframework.web.client.RestTemplate;
+import org.springframework.util.StreamUtils;
+import org.springframework.web.client.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import java.io.InputStream;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 
@@ -36,7 +41,12 @@ public final class ZarinpalHttpClient {
 
     public static ZarinpalHttpClient create(ZarinpalConfig config) {
         ObjectMapper mapper = ZarinpalObjectMapper.create();
-        RestTemplate restTemplate = new RestTemplate();
+        HttpClient httpClient = HttpClient.newBuilder()
+                .connectTimeout(config.connectTimeout())
+                .build();
+        JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
+        requestFactory.setReadTimeout(config.readTimeout());
+        RestTemplate restTemplate = new RestTemplate(requestFactory);
         return new ZarinpalHttpClient(config, restTemplate, mapper);
     }
 
@@ -45,6 +55,8 @@ public final class ZarinpalHttpClient {
         if (requestFactory instanceof SimpleClientHttpRequestFactory simpleFactory) {
             simpleFactory.setConnectTimeout((int) config.connectTimeout().toMillis());
             simpleFactory.setReadTimeout((int) config.readTimeout().toMillis());
+        } else if (requestFactory instanceof JdkClientHttpRequestFactory jdkFactory) {
+            jdkFactory.setReadTimeout(config.readTimeout());
         }
         if (restTemplate.getErrorHandler() instanceof DefaultResponseErrorHandler) {
             restTemplate.setErrorHandler(new ResponseErrorHandler() {
@@ -68,14 +80,18 @@ public final class ZarinpalHttpClient {
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setAccept(List.of(MediaType.APPLICATION_JSON));
         headers.set(HttpHeaders.USER_AGENT, config.userAgent());
-        HttpEntity<String> entity = new HttpEntity<>(body, headers);
         int attempts = config.retryEnabled() ? config.retryMaxAttempts() : 1;
         long backoffMillis = config.retryEnabled() ? config.retryBackoff().toMillis() : 0;
         RestClientException last = null;
         for (int attempt = 1; attempt <= attempts; attempt++) {
             ResponseEntity<String> response;
             try {
-                response = restTemplate.exchange(url, HttpMethod.POST, entity, String.class);
+                response = restTemplate.execute(url, HttpMethod.POST, httpRequest -> {
+                    httpRequest.getHeaders().putAll(headers);
+                    if (body != null && !body.isBlank()) {
+                        httpRequest.getBody().write(body.getBytes(StandardCharsets.UTF_8));
+                    }
+                }, responseExtractor);
             } catch (RestClientException ex) {
                 last = ex;
                 if (attempt == attempts) {
@@ -91,6 +107,9 @@ public final class ZarinpalHttpClient {
                 }
                 continue;
             }
+            if (response == null) {
+                throw new ZarinpalTransportException("Request to Zarinpal failed", null);
+            }
             return responseParser.parse(response, successCodes, dataType);
         }
         throw new ZarinpalTransportException("Request to Zarinpal failed", last);
@@ -103,4 +122,14 @@ public final class ZarinpalHttpClient {
             throw new ZarinpalValidationException("Request body is invalid", ex);
         }
     }
+
+    private static final ResponseExtractor<ResponseEntity<String>> responseExtractor = response -> {
+        String responseBody = null;
+        try (InputStream stream = response.getBody()) {
+            if (stream != null) {
+                responseBody = StreamUtils.copyToString(stream, StandardCharsets.UTF_8);
+            }
+        }
+        return new ResponseEntity<>(responseBody, response.getHeaders(), response.getStatusCode());
+    };
 }
