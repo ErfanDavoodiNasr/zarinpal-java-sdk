@@ -9,10 +9,10 @@
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>com.ernoxin</groupId>
-    <artifactId>ZarinPal-java-SDK</artifactId>
-    <version>1.0.4</version>
-    <name>ZarinPal-java-SDK</name>
-    <description>ZarinPal-java-SDK</description>
+    <artifactId>zarinpal-java-sdk</artifactId>
+    <version>1.1.0</version>
+    <name>zarinpal-java-sdk</name>
+    <description>zarinpal-java-sdk</description>
 
     <properties>
         <java.version>21</java.version>
