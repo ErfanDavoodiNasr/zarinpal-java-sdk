@@ -45,7 +45,6 @@ public final class ZarinpalHttpClient {
                 .connectTimeout(config.connectTimeout())
                 .build();
         JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
-        requestFactory.setReadTimeout(config.readTimeout());
         RestTemplate restTemplate = new RestTemplate(requestFactory);
         return new ZarinpalHttpClient(config, restTemplate, mapper);
     }
