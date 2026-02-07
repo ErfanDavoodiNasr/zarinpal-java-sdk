@@ -25,12 +25,29 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * Low-level HTTP client wrapper for Zarinpal API calls.
+ *
+ * <p>This component serializes request payloads, configures headers, executes
+ * POST requests, applies optional transport retries, and delegates response
+ * validation to {@link ZarinpalResponseParser}.
+ *
+ * <p>Thread-safety: safe for concurrent use once fully constructed.
+ *
+ */
 public final class ZarinpalHttpClient {
     private final ZarinpalConfig config;
     private final RestTemplate restTemplate;
     private final ObjectMapper mapper;
     private final ZarinpalResponseParser responseParser;
 
+    /**
+     * Creates an HTTP client using caller-provided dependencies.
+     *
+     * @param config SDK config containing base URL, timeouts, retries, and user agent
+     * @param restTemplate transport client implementation
+     * @param mapper JSON mapper used for request serialization and response parsing
+     */
     public ZarinpalHttpClient(ZarinpalConfig config, RestTemplate restTemplate, ObjectMapper mapper) {
         this.config = config;
         this.restTemplate = restTemplate;
@@ -39,6 +56,12 @@ public final class ZarinpalHttpClient {
         configureRestTemplate(restTemplate, config);
     }
 
+    /**
+     * Creates a default HTTP client from SDK configuration.
+     *
+     * @param config SDK config
+     * @return new HTTP client instance
+     */
     public static ZarinpalHttpClient create(ZarinpalConfig config) {
         ObjectMapper mapper = ZarinpalObjectMapper.create();
         HttpClient httpClient = HttpClient.newBuilder()
@@ -71,6 +94,21 @@ public final class ZarinpalHttpClient {
         }
     }
 
+    /**
+     * Executes a POST call and maps the response data section into {@code dataType}.
+     *
+     * <p>Retries are applied only to transport exceptions when retry is enabled in
+     * {@link ZarinpalConfig}. Logical API errors are not retried.
+     *
+     * @param path endpoint path relative to configured base URL
+     * @param request request payload object
+     * @param dataType target data type for {@code data} JSON object
+     * @param successCodes acceptable gateway codes in {@code data.code}
+     * @param <T> response type
+     * @return parsed and validated response data object
+     * @throws ZarinpalValidationException when request body serialization fails
+     * @throws ZarinpalTransportException when transport fails or no response is received
+     */
     public <T> T post(String path, Object request, Class<T> dataType, Set<Integer> successCodes) {
         URI baseUrl = config.baseUrl();
         URI url = UriComponentsBuilder.fromUri(baseUrl).path(path).build().toUri();

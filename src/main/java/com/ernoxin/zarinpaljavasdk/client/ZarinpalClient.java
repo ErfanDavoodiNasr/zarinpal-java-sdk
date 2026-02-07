@@ -15,14 +15,59 @@ import org.springframework.web.util.UriComponentsBuilder;
 import java.net.URI;
 import java.util.*;
 
+/**
+ * High-level synchronous client for Zarinpal payment operations.
+ *
+ * <p>Main responsibilities:
+ * <ol>
+ *   <li>Validate request models before network calls.</li>
+ *   <li>Map API operations to endpoint paths and payloads.</li>
+ *   <li>Parse callback query parameters to a typed model.</li>
+ * </ol>
+ *
+ * <p>Thread-safety: this type is immutable and safe for concurrent use when
+ * shared across threads.
+ *
+ * <p>Network behavior is controlled by {@link ZarinpalConfig}:
+ * connect/read timeouts, retry enablement, max attempts, and retry backoff.
+ *
+ * <p>Example payment and verification flow:
+ * <pre>{@code
+ * PaymentRequest request = PaymentRequest.builder(150_000, "Subscription")
+ *         .currency(ZarinpalCurrency.IRR)
+ *         .build();
+ *
+ * PaymentRequestResult created = client.requestPayment(request);
+ * String redirectUrl = client.buildRedirectUrl(created.authority());
+ *
+ * ZarinpalCallback callback = client.parseCallback(queryParams);
+ * if (callback.isOk()) {
+ *     VerifyResult verified = client.verifyPayment(new VerifyRequest(150_000, callback.authority()));
+ * }
+ * }</pre>
+ *
+ */
 public final class ZarinpalClient {
     private final ZarinpalConfig config;
     private final ZarinpalHttpClient httpClient;
 
+    /**
+     * Creates a client using the SDK default HTTP client.
+     *
+     * @param config validated SDK configuration
+     * @throws ZarinpalValidationException when {@code config} is {@code null}
+     */
     public ZarinpalClient(ZarinpalConfig config) {
         this(config, ZarinpalHttpClient.create(config));
     }
 
+    /**
+     * Creates a client with a custom HTTP client.
+     *
+     * @param config validated SDK configuration
+     * @param httpClient HTTP client implementation
+     * @throws ZarinpalValidationException when any argument is {@code null}
+     */
     public ZarinpalClient(ZarinpalConfig config, ZarinpalHttpClient httpClient) {
         if (config == null) {
             throw new ZarinpalValidationException("config is required");
@@ -34,6 +79,19 @@ public final class ZarinpalClient {
         this.httpClient = httpClient;
     }
 
+    /**
+     * Requests a new payment authority.
+     *
+     * <p>Callback URL resolution order:
+     * <ol>
+     *   <li>{@link PaymentRequest#callbackUrl()}</li>
+     *   <li>{@link ZarinpalConfig#callbackUrl()}</li>
+     * </ol>
+     *
+     * @param request payment request model
+     * @return typed creation result containing authority and gateway response data
+     * @throws ZarinpalValidationException when request is null or fails local validation
+     */
     public PaymentRequestResult requestPayment(PaymentRequest request) {
         if (request == null) {
             throw new ZarinpalValidationException("payment request is required");
@@ -54,6 +112,13 @@ public final class ZarinpalClient {
         return httpClient.post(ZarinpalEndpoints.request(config.operationVersion()), payload, PaymentRequestResult.class, Set.of(100));
     }
 
+    /**
+     * Verifies a previously created payment authority.
+     *
+     * @param request verification request containing original amount and authority
+     * @return verification result
+     * @throws ZarinpalValidationException when request is null or invalid
+     */
     public VerifyResult verifyPayment(VerifyRequest request) {
         if (request == null) {
             throw new ZarinpalValidationException("verify request is required");
@@ -63,6 +128,13 @@ public final class ZarinpalClient {
         return httpClient.post(ZarinpalEndpoints.verify(config.operationVersion()), payload, VerifyResult.class, Set.of(100, 101));
     }
 
+    /**
+     * Reverses a verified payment when gateway rules allow it.
+     *
+     * @param request reverse request containing authority
+     * @return reverse result
+     * @throws ZarinpalValidationException when request is null or authority is invalid
+     */
     public ReverseResult reversePayment(ReverseRequest request) {
         if (request == null) {
             throw new ZarinpalValidationException("reverse request is required");
@@ -72,11 +144,23 @@ public final class ZarinpalClient {
         return httpClient.post(ZarinpalEndpoints.reverse(config.operationVersion()), payload, ReverseResult.class, Set.of(100));
     }
 
+    /**
+     * Returns unverified payment authorities for the configured merchant.
+     *
+     * @return unverified authorities and gateway response metadata
+     */
     public UnverifiedResult unverifiedPayments() {
         UnverifiedPayload payload = new UnverifiedPayload(config.merchantId());
         return httpClient.post(ZarinpalEndpoints.unverified(config.operationVersion()), payload, UnverifiedResult.class, Set.of(100));
     }
 
+    /**
+     * Retrieves current status for a payment authority.
+     *
+     * @param request inquiry request containing authority
+     * @return inquiry result
+     * @throws ZarinpalValidationException when request is null or authority is invalid
+     */
     public InquiryResult inquirePayment(InquiryRequest request) {
         if (request == null) {
             throw new ZarinpalValidationException("inquiry request is required");
@@ -86,6 +170,13 @@ public final class ZarinpalClient {
         return httpClient.post(ZarinpalEndpoints.inquiry(config.operationVersion()), payload, InquiryResult.class, Set.of(100));
     }
 
+    /**
+     * Calculates gateway fee for a candidate amount.
+     *
+     * @param request fee calculation request
+     * @return fee calculation result
+     * @throws ZarinpalValidationException when request is null or amount is below minimum
+     */
     public FeeCalculationResult calculateFee(FeeCalculationRequest request) {
         if (request == null) {
             throw new ZarinpalValidationException("fee calculation request is required");
@@ -95,6 +186,13 @@ public final class ZarinpalClient {
         return httpClient.post(ZarinpalEndpoints.feeCalculation(config.operationVersion()), payload, FeeCalculationResult.class, Set.of(100));
     }
 
+    /**
+     * Builds redirect URL for sending user to Zarinpal payment page.
+     *
+     * @param authority authority returned by payment request
+     * @return absolute redirect URL
+     * @throws ZarinpalValidationException when authority is invalid
+     */
     public String buildRedirectUrl(String authority) {
         ZarinpalValidation.requireAuthority(authority);
         URI baseUrl = config.baseUrl();
@@ -105,6 +203,16 @@ public final class ZarinpalClient {
                 .toUriString();
     }
 
+    /**
+     * Parses callback query parameters from a flat map.
+     *
+     * <p>Parameter names are matched case-insensitively for {@code Authority}
+     * and {@code Status}. Valid status values are {@code OK} and {@code NOK}.
+     *
+     * @param queryParams callback query parameter map
+     * @return parsed callback model
+     * @throws ZarinpalCallbackException when required parameters are missing or invalid
+     */
     public ZarinpalCallback parseCallback(Map<String, String> queryParams) {
         if (queryParams == null) {
             throw new ZarinpalCallbackException("queryParams is required");
@@ -127,6 +235,15 @@ public final class ZarinpalClient {
         return new ZarinpalCallback(authority, status);
     }
 
+    /**
+     * Parses callback query parameters from Spring's {@link MultiValueMap}.
+     *
+     * <p>Only the first value of each key is considered.
+     *
+     * @param queryParams callback query parameters
+     * @return parsed callback model
+     * @throws ZarinpalCallbackException when required parameters are missing or invalid
+     */
     public ZarinpalCallback parseCallback(MultiValueMap<String, String> queryParams) {
         if (queryParams == null) {
             throw new ZarinpalCallbackException("queryParams is required");
@@ -253,6 +370,8 @@ public final class ZarinpalClient {
                 throw new ZarinpalValidationException("wages total is too large");
             }
         }
+
+        // Gateway expects total wages to remain under or equal to 99% of original amount.
         long maxAllowed = amount - Math.floorDiv(amount, 100);
         if (total > maxAllowed) {
             throw new ZarinpalValidationException("wages total must be at most 99% of amount");

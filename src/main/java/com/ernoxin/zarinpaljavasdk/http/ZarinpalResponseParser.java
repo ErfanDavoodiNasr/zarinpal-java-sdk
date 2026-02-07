@@ -9,13 +9,40 @@ import org.springframework.http.ResponseEntity;
 
 import java.util.Set;
 
+/**
+ * Parses Zarinpal API envelopes into typed response models.
+ *
+ * <p>Expected response shape:
+ * <ul>
+ *   <li>{@code errors}: empty/null on success</li>
+ *   <li>{@code data}: object containing business fields and {@code code}</li>
+ * </ul>
+ *
+ * <p>Any parsing/validation failure is mapped to {@link ZarinpalApiException}.
+ *
+ */
 public final class ZarinpalResponseParser {
     private final ObjectMapper mapper;
 
+    /**
+     * Creates a parser.
+     *
+     * @param mapper Jackson mapper used to read tree and convert data node
+     */
     public ZarinpalResponseParser(ObjectMapper mapper) {
         this.mapper = mapper;
     }
 
+    /**
+     * Parses response body and maps {@code data} node to target type.
+     *
+     * @param response raw HTTP response
+     * @param successCodes accepted values of {@code data.code}
+     * @param dataType target mapped type
+     * @param <T> response type
+     * @return mapped data object
+     * @throws ZarinpalApiException when body is invalid, contains errors, or code/status is unsuccessful
+     */
     public <T> T parse(ResponseEntity<String> response, Set<Integer> successCodes, Class<T> dataType) {
         int status = response.getStatusCode().value();
         String body = response.getBody();

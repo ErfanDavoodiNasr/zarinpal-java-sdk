@@ -4,6 +4,13 @@ import lombok.experimental.UtilityClass;
 
 import java.util.Map;
 
+/**
+ * Catalog of known Zarinpal gateway codes to human-readable messages.
+ *
+ * <p>This catalog is best-effort and used as a fallback when response messages
+ * are missing or empty.
+ *
+ */
 @UtilityClass
 public class ZarinpalErrorCatalog {
     private static final Map<Integer, String> MESSAGES = Map.ofEntries(
@@ -49,6 +56,12 @@ public class ZarinpalErrorCatalog {
             Map.entry(429, "Referrer code format is invalid.")
     );
 
+    /**
+     * Returns catalog message for a gateway code.
+     *
+     * @param code gateway code
+     * @return catalog message or {@code null} when code is unknown
+     */
     public static String messageFor(Integer code) {
         if (code == null) {
             return null;
